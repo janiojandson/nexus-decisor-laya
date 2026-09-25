@@ -1,7 +1,7 @@
 # AGENTE: Laya — Decisor do Sistema 1
 **Módulo:** nexus-decisor-laya
 **Versão do Agente:** 2.0.0 (Laya real — NandhaKishorM/laya)
-**Porta do Serviço:** 8000 (Railway Private Mesh)
+**Porta do Serviço:** 8080 (Railway) · 8000 em dev local
 **Papel na arquitetura:** Camada 1 — portão barato de triagem (decide SE e PARA ONDE, antes de qualquer LLM)
 
 ## 🎯 1. MISSÃO E ESCOPO
@@ -36,13 +36,18 @@
 
 | Var | Valor | Função |
 |---|---|---|
-| `LAYA_PORT` | 8000 | Porta do serviço |
+| `LAYA_PORT` | 8080 (Railway) · 8000 local | Porta do serviço |
 | `LAYA_DEVICE` | cpu | Inferência CPU (~200-400ms) |
 | `LAYA_PRELOAD` | 1 | Checkpoints pré-carregados (sem cold start por idioma) |
 | `LAYA_MODELS` | multilingual | Só o checkpoint multilingual (pt-BR) — economiza RAM |
 | `LAYA_THREADS` | 2 | Threads de inferência |
-| `LAYA_API_KEY` | (opcional) | Se setada, exige `Authorization: Bearer <key>` |
+| `LAYA_API_KEY` | (opcional) | Se setada, exige header `x-laya-key` |
 | `HF_HOME` | /data/hf | Cache de checkpoints no volume persistente |
+
+## 💻 USO LOCAL (terminal / IDE)
+
+CLI na pasta do projeto: `node tools/laya-local.js "mensagem ou comando para triagem"`.
+Env `LAYA_URL` (default: domínio público do Railway; `http://localhost:8000` para Laya local).
 
 ## 🛡️ 4. REGRAS DO ECOSSISTEMA
 
