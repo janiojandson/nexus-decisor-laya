@@ -1,13 +1,13 @@
 # TEMPLATE — AGENTS.md (Padrão Unificado de Módulo Nexus)
-> Versão 2.1 · 25/09/2026 · Laya REAL deployada (NandhaKishorM/laya) · Copie para a raiz de cada módulo como `AGENTS.md`
+> Versão 2.3 · 25/09/2026 · Laya REAL ativa (:8000) · OmniRoute com Volume Persistente (:8080) · Postgres Central Unificado (:5432)
 
 ---
 
 # AGENTE: [Nome do Agente / Microsserviço]
-**Módulo:** [ex: nexus-cerebro / buscador / financas-backend]
-**Versão do Agente:** 2.0.0
+**Módulo:** [ex: nexus-cerebro / buscador / financas-backend / operacional]
+**Versão do Agente:** 2.2.0
 **Porta do Serviço:** [ver tabela oficial abaixo]
-**Decisor de Sistema 1:** Laya ✅ (Railway: `http://nexus-decisor-laya.railway.internal:8000/v1/systemone` · dev local: `http://localhost:8000/v1/systemone`)
+**Decisor de Sistema 1:** Laya ✅ (Railway: `http://nexus-decisor-laya.railway.internal:8000/v1/systemone` · dev local: `http://localhost:8000/v1/systemone` ou `https://nexus-decisor-laya-production.up.railway.app/v1/systemone`)
 
 ## 🎯 1. MISSÃO E ESCOPO
 
@@ -19,114 +19,79 @@
 - Nunca alterar contratos de rotas existentes sem retrocompatibilidade.
 - Toda comunicação inter-serviços pela Railway Private Mesh (`*.railway.internal:PORTA`).
 
-## 🏗️ 2. ARQUITETURA DE 4 CAMADAS (sem sobreposição)
+## 🏗️ 2. ARQUITETURA DE 4 CAMADAS (Universal: Telegram, Terminal, OpenCode e IDE)
 
 ```
-Entrada (Telegram | Painel | Webhook | Cron)
-  → CAMADA 1 — LAYA (Sistema 1)  [✅ ATIVA — modo sombra no cérebro]
-      Triagem ~200-400ms CPU, R$0: precisa LLM? qual destino? qual risco?
-      → Não precisa LLM: despacho DIRETO ao membro/setor (após fase sombra)
-      → Precisa: segue para Camada 2
-  → CAMADA 2 — CÉREBRO (orquestrador) [✅ existe]
-      pensarEAgir + tool calling + despacho aos membros
-  → CAMADA 3 — OMNIROUTE (maestro de LLM) [✅ existe]
-      Rotas auto/* escolhem modelo + chave + provider
-  → CAMADA 4 — PROVIDERS [✅ 52+ conexões]
-      GLM-5.1 (Modal) · OAuth Google (agy/antigravity/kiro) · OpenRouter · NVIDIA...
+Entrada (Telegram | Terminal CLI | OpenCode / IDE | Webhook | Cron)
+  → CAMADA 1 — LAYA (Sistema 1)  [✅ ATIVA — <1s, R$0 de tokens]
+      Triagem rápida CPU: identifica destino, risco operacional e necessidade de LLM.
+      Atua UNIVERSALMENTE em todas as chamadas do Cérebro (não apenas no Telegram).
+      CLI Local / OpenCode: node tools/laya-local.js "sua diretriz"
+  → CAMADA 2 — CÉREBRO (Orquestrador Sistema 2) [✅ 100% Desinchado]
+      pensarEAgir + tool calling distribuído + despacho aos Membros da frota.
+  → CAMADA 3 — OMNIROUTE (Maestro de Chaves & IA) [✅ Volume /app/data Persistente]
+      Centraliza rotação, 7 contas Antigravity, pools free (Groq, Gemini, OpenRouter) e chaves pagas.
+      Rotas semânticas: auto/best-coding, auto/best-fast, auto/best-free, auto/best-reasoning.
+  → CAMADA 4 — PROVIDERS & MEMBROS [✅ Execução Final]
+      Google Gemini · Groq · OpenRouter · Modal GLM-5.1 · Membro Sistema · Membro Memória · Membro GitHub.
 ```
 
-**Papel de cada camada (não invadir o vizinho):**
-- Laya = portão barato (decide SE e PARA ONDE)
-- Cérebro = orquestração (COMO executar, tool calling)
-- OmniRoute = roteamento de LLM (QUAL modelo e chave)
-- Providers = execução final
+## 💰 3. REGRA DE OURO DE INFRAESTRUTURA & ECONOMIA (VOLUMES & BANCO)
 
-## 📡 3. PROTOCOLO LAYA (ativo)
+Ao criar um novo projeto ou refatorar projetos existentes, **NUNCA instancie banco ou volume redundante**:
 
-- **Endpoint Railway (produção):** `POST http://nexus-decisor-laya.railway.internal:8000/v1/systemone`
-- **Endpoint dev local:** `POST http://localhost:8000/v1/systemone`
-- **Timeout:** 1.5s com fallback automático para a Camada 2 (cérebro) — falha nunca bloqueia.
-- **Primitivas:** `choice` (máx. 15-20 opções) · `score` (níveis descritos) · `noul` (sim/não com probabilidade).
-- **Gating:** usar `answer_confidence` (probabilidade calibrada). ≥ 0.88 age direto · < 0.70 valida via `auto/best-fast`.
-- **Risco** score 0-2 (normalizar /2): > 0.65 exige confirmação humana ou caminho deliberado.
-- **Checkpoint:** multilingual (pt-BR) · CPU ~200-400ms · volume persistente para cache.
+1. **Postgres Principal Unificado (Regra de Custo Zero de Infra):**
+   - **NÃO crie containers PostgreSQL adicionais** (cada container gasta RAM e volume desnecessários).
+   - Use SEMPRE o **`Postgres` Principal** (`postgres.railway.internal:5432`).
+   - Para isolamento de projetos, crie um **Database dedicado** dentro do servidor principal (ex: `financas_db`, `railway`).
+   - String de conexão: `postgresql://postgres:eyxuLapofrztxnKcfhRZVgBAajjfAuUY@postgres.railway.internal:5432/NOME_DO_SEU_DB`
 
-### Payload de entrada (contrato futuro):
-```json
-{
-  "state": { "origem": "telegram|painel|webhook|cron", "mensagem": "..." },
-  "questions": {
-    "destino":     { "type": "choice", "options": ["memoria","sistema","github","mercado_financeiro","licitacoes","buscador","descarte"] },
-    "risco":       { "type": "scale", "range": [0.0, 1.0] },
-    "precisa_llm": { "type": "boolean" }
-  }
-}
-```
+2. **Diretriz de Volumes Persistentes (Railway):**
+   - **Serviços Stateless (Custo Zero de Disco):** Não adicione volume a microsserviços de lógica pura (ex: `buscador`, `licitacoes`, `membro-sistema`).
+   - **Serviços Stateful Críticos (Volume Obrigatório):**
+     - `Postgres`: `/var/lib/postgresql/data` (dados relacionais).
+     - `nexus-omniroute`: `/app/data` (blindagem permanente de contas Antigravity e chaves SQLite).
+     - `nexus-decisor-laya`: `/data` (cache de PyTorch/HF, evita re-download de ~1GB).
+     - `comunicacao-hub`: `/app/storage` (sessões de WhatsApp).
 
-## 🧠 4. CAMADA GENERATIVA (Sistema 2 — via OmniRoute)
+## 📡 4. PROTOCOLO LAYA (Sistema 1 no Terminal, OpenCode e Telegram)
 
-- **NUNCA hardcode modelo.** Usar as rotas auto do gateway:
-  - `auto/best-coding` — default para código + tool calling
-  - `auto/best-fast` — validações rápidas e triagem
-  - `auto/best-free` — tarefas de baixo custo
-  - `auto/best-reasoning` — raciocínio profundo
-- **Condição de disparo:** Laya retornar `precisa_llm: true` ou confiança < 0.70 (quando Laya existir).
-- **Formato de saída:** JSON puro ou Markdown estrito, sem introduções.
-- **Cérebro já 100% OmniRoute:** `OMNIROUTE_BASE_URL=http://nexus-omniroute.railway.internal:8080/v1`
+A Laya é acessível por qualquer ferramenta (Node, Python, cURL, OpenCode):
 
-## 🔌 5. TABELA OFICIAL DE PORTAS (verificada no Railway em 25/09/2026)
+- **Como usar no OpenCode / Terminal:**
+  ```bash
+  node tools/laya-local.js "como está o mercado financeiro hoje?"
+  # Retorna em <1s: Destino: mercado_financeiro (100%) | Risco: 0.7/2 | Precisa LLM: NÃO
+  ```
+- **Como o Cérebro usa internamente:**
+  Todo comando que entra via `pensarEAgir` (seja por API HTTP do OpenCode, porta 3000, ou Telegram) passa primeiro pela função `triagemLaya()` registrando telemetria e intenção antes de gastar qualquer token.
 
-| Serviço | Porta | Status |
-|---|---|---|
-| nexus-cerebro | 3000 | ✅ ativo |
-| nexus-membro-github | 3001 | ✅ ativo |
-| nexus-membro-sistema | 3002 | ✅ ativo |
-| nexus-membro-memoria | 3003 | ✅ ativo |
-| Mercado Financeiro | 4000 | ✅ ativo (contrato oficial) |
-| nexus-omniroute | **8080** | ✅ ativo (⚠️ NÃO é 20128 no Railway — 20128 é só local) |
-| nexus-decisor-laya | 8080 no Railway (dominio publico resolve a porta) · 8000 em dev local | ✅ **ATIVO** (Laya real, checkpoint multilingual) |
-| Finanças-Backend / Frontend | ver Railway | ✅ ativos (portas automáticas) |
-| buscador / licitacoes / comunicacao-hub | ver Railway | ✅ ativos (portas automáticas) |
+## 🔌 5. TABELA OFICIAL DE PORTAS (Topologia Homologada)
 
-**Regras:** nunca invadir 3000-3003 nem 4000. Portas de serviços gerenciados pelo Railway usam `RAILWAY_PUBLIC_DOMAIN`.
-
-## 💻 USO LOCAL (terminal / IDE)
-
-A Laya aceita qualquer cliente HTTP. CLI de exemplo (`tools/laya-local.js`):
-
-```bash
-node tools/laya-local.js "me mostra o status dos servicos"
-# 📌 Destino: sistema (94%) | ⚠️ Risco: 0.87/2 | 🧠 Precisa LLM: NÃO | 🛡️ Ação: despacho direto
-```
-
-- `LAYA_URL` env: default = domínio público do Railway; use `http://localhost:8000` para Laya local.
-- Contrato: `POST {url}/v1/systemone` · types: `choice` / `score` / `noul` · gating: `answer_confidence`.
-
-## 🛡️ 6. SEGURANÇA OBRIGATÓRIA
-
-- Shell só via allowlist (ver `membro-sistema/src/tools/shellExec.js`).
-- Segredos SÓ em variáveis de ambiente do Railway — nunca no código.
-- `x-nexus-key` obrigatório em endpoints de execução.
-- Timeouts: LLM até 5 min (GLM cold start) · Laya 1.5s · HTTP interno 30s.
+| Serviço | Porta | Domínio Interno Railway | Domínio Público / Local |
+|---|---|---|---|
+| **nexus-cerebro** | **3000** | `nexus-cerebro.railway.internal:3000` | `nexus-cerebro-production-a7c0.up.railway.app` |
+| **nexus-membro-github** | **3001** | `tranquil-eagerness.railway.internal:3001` | Interno |
+| **nexus-membro-sistema** | **3002** | `nexus-membro-sistema.railway.internal:3002` | Interno |
+| **nexus-membro-memoria** | **3003** | `nexus-membro-memoria.railway.internal:3003` | Interno |
+| **Mercado Financeiro** | **4000** | `operacional.railway.internal:4000` | `operacional-production-57d9.up.railway.app` |
+| **Postgres Principal** | **5432** | `postgres.railway.internal:5432` | Proxy TCP externo 25561 |
+| **nexus-decisor-laya** | **8000** | `nexus-decisor-laya.railway.internal:8000` | `nexus-decisor-laya-production.up.railway.app` |
+| **nexus-omniroute** | **8080** | `nexus-omniroute.railway.internal:8080` | `nexus-omniroute-production.up.railway.app` |
 
 ---
 
-## 📜 7. FONTE DA VERDADE DO ECOSSISTEMA
+## 📜 6. FONTE DA VERDADE DO ECOSSISTEMA
 
-### Documento Mestre (Caminho Local)
-`D:\Programas\Desenvolvendo\Documento_Mestre_Projeto_SaaS`
-
-**Papel:** Contém as diretrizes mestras, a topologia de rede oficial e os documentos que alimentam o **NotebookLM** (caderno *Nexus Holding — Ecossistema Geral*) e o **Obsidian Vault** (via `nexus-membro-memoria` :3003).
-
-### Instruções Locais do Módulo
-- Cada módulo **pode** conter sua subpasta `docs/instructions/` para regras de negócio específicas.
-- Essas regras são **sempre subordinadas** ao Documento Mestre — em caso de conflito, o Documento Mestre prevalece.
-
-### Protocolo de Sincronização Obrigatório
-1. Toda alteração em **portas**, **contratos de rotas** ou **novas rotinas** que envolvam a Laya (:8080) deve ser **registrada** para atualização no `Documento_Mestre_Projeto_SaaS`.
-2. Após o registro, **sincronizar** com o **NotebookLM** (caderno *Nexus Holding — Ecossistema Geral*) para manter a base de conhecimento do ecossistema coerente com a infraestrutura real.
-3. O módulo-memória (`:3003`) é o ponto de ponte entre o código e o Obsidian Vault — notas de mudança de topologia devem ser cimentadas no cofre via `escrever_obsidian` quando aplicável.
+### Documento Mestre & NotebookLM:
+- **Caminho Local:** `D:\Programas\Desenvolvendo\Documento_Mestre_Projeto_SaaS`
+- **Caderno NotebookLM:** *Nexus Holding — Ecossistema Geral*
+- Toda nova regra de banco unificado, portas e volumes deve ser sincronizada nesses arquivos para manter o cérebro institucional e os agentes alinhados.
 
 ---
 
-*Este arquivo é lido automaticamente por opencode, Antigravity e agentes. Mantenha atualizado a cada mudança de porta/contrato.*
+## 📊 7. REGRAS DE ARQUITETURA VISUAL E DESACOPLAMENTO DE DASHBOARDS (POSTGRESQL + LOOKER STUDIO)
+1. **Zero Webhook para Planilhas**: Sempre que a demanda envolver a criação de dashboards, painéis de auditoria, relatórios gerenciais ou cálculos de métricas sobre dados operacionais já armazenados no PostgreSQL do Railway, a IA NÃO deve criar lógicas de apresentação, requisições HTTP secundárias (webhooks) ou integrações via código para planilhas como o Google Sheets.
+2. **Responsabilidade Única do Backend**: A aplicação (backend) deve manter a responsabilidade única de registrar os dados brutos em alta velocidade (fire-and-forget), preservando a latência exigida (sub-25ms) e o rate limit das rotas críticas.
+3. **Google Looker Studio Passivo**: Para visualização de métricas e comparativos, a IA deve sugerir apenas a criação de Views SQL estruturadas no PostgreSQL e orientar a conexão direta, gratuita e passiva do Google Looker Studio à URL Pública do banco (`zephyr.proxy.rlwy.net:25561`).
+
