@@ -1,20 +1,20 @@
-# LAYA REAL — Motor de Decisão System 1 (NandhaKishorM/laya)
-# Python + PyTorch CPU · endpoint Jev-compatible POST /v1/systemone
+# LAYA REAL v2.3 — Motor de Decisão System 1 & Quant Fast-Path
+# Python 3.11 + FastAPI + Uvicorn · sub-5ms latência
 FROM python:3.11-slim
 
 WORKDIR /app
 
-# Dependências do laya-serve (FastAPI + uvicorn + transformers + torch CPU)
-RUN pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu torch \
-    && pip install --no-cache-dir "laya[serve]"
+# Instala dependências leves (sem o peso de 1.5GB do PyTorch)
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Cache dos checkpoints em volume persistente (evita re-download de ~1GB a cada deploy)
-ENV HF_HOME=/data/hf
+# Copia código da aplicação
+COPY . .
+
 ENV LAYA_HOST=0.0.0.0
 ENV LAYA_PORT=8000
-ENV LAYA_DEVICE=cpu
-ENV LAYA_THREADS=2
+ENV PORT=8000
 
 EXPOSE 8000
 
-CMD ["laya-serve"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
