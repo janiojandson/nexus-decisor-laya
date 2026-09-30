@@ -26,10 +26,6 @@ def extract_quant_payload(req_data: Dict[str, Any]) -> Dict[str, Any]:
     delta_stop_bps = float(req_data.get("delta_stop_bps") or state.get("delta_stop_bps") or 0.0)
     signal_source = req_data.get("signalSource") or state.get("signalSource") or "FLOW_SIGNAL"
     
-    # Se delta_stop_bps veio zerado mas temos preços, calcula
-    if delta_stop_bps <= 0 and current_price > 0 and proposed_stop > 0:
-        delta_stop_bps = round((abs(current_price - proposed_stop) / current_price) * 10000, 2)
-    
     # Bloco de microestrutura
     micro = req_data.get("microstructure") or state.get("microstructure") or {}
     spread_bps = float(micro.get("spreadBps", 0.0))
@@ -46,7 +42,7 @@ def extract_quant_payload(req_data: Dict[str, Any]) -> Dict[str, Any]:
     # Bloco de risco
     risk = req_data.get("risk") or state.get("risk") or {}
     account_equity = float(risk.get("accountEquity", 10000.0))
-    curr_risk_agg = float(risk.get("currentRiskAggregatePct", 0.0))
+    curr_risk_agg =float(risk.get("currentRiskAggregatePct", 0.0))
     prop_risk_pct = float(risk.get("proposedRiskPct", 0.01))
     
     # Intent / Contexto
@@ -54,6 +50,63 @@ def extract_quant_payload(req_data: Dict[str, Any]) -> Dict[str, Any]:
     intent_group = "PRE_ENTRY"
     intent_subgroup = "NEW_OPPORTUNITY"
     current_r = 0.0
+    
+    # Validação crítica: preços devem ser estritamente positivos
+    if current_price <= 0 or proposed_stop <= 0:
+        return {
+            "symbol": symbol,
+            "side": side.upper(),
+            "current_price": current_price,
+            "proposed_stop": proposed_stop,
+            "proposed_tp": proposed_tp,
+            "delta_stop_bps": 0.0,
+            "signal_source": signal_source,
+            "spread_bps": spread_bps,
+            "depth_imbalance": depth_imbalance,
+            "whale_wall_detected": whale_wall_detected,
+            "wall_persistence_ms": wall_persistence_ms,
+            "regime": regime.upper(),
+            "circuit_breaker": circuit_breaker,
+            "power_multiplier": power_multiplier,
+            "account_equity": account_equity,
+            "curr_risk_agg": curr_risk_agg,
+            "prop_risk_pct": prop_risk_pct,
+            "intent_group": intent_group,
+            "intent_subgroup": "INVALID_PAYLOAD",
+            "current_r": current_r,
+            "body": body,
+            "_validation_error": "V00_INVALID_PRICE_OR_STOP"
+        }
+    
+    # Se delta_stop_bps veio zerado mas temos preços, calcula
+    if delta_stop_bps <= 0:
+        delta_stop_bps = round((abs(current_price - proposed_stop) / current_price) * 10000, 2)
+        # Valida após cálculo
+        if delta_stop_bps < MIN_DELTA_STOP_BPS:
+            return {
+                "symbol": symbol,
+                "side": side.upper(),
+                "current_price": current_price,
+                "proposed_stop": proposed_stop,
+                "proposed_tp": proposed_tp,
+                "delta_stop_bps": delta_stop_bps,
+                "signal_source": signal_source,
+                "spread_bps": spread_bps,
+                "depth_imbalance": depth_imbalance,
+                "whale_wall_detected": whale_wall_detected,
+                "wall_persistence_ms": wall_persistence_ms,
+                "regime": regime.upper(),
+                "circuit_breaker": circuit_breaker,
+                "power_multiplier": power_multiplier,
+                "account_equity": account_equity,
+                "curr_risk_agg": curr_risk_agg,
+                "prop_risk_pct": prop_risk_pct,
+                "intent_group": intent_group,
+                "intent_subgroup": "INVALID_PAYLOAD",
+                "current_r": current_r,
+                "body": body,
+                "_validation_error": "V12_INSUFFICIENT_DELTA_CALCULATED"
+            }
     
     if "COOLDOWN_AUDIT" in body or "COOLDOWN" in body:
         intent_group = "COOLDOWN_AUDIT"
@@ -115,6 +168,11 @@ def evaluate_quant_rules(payload: Dict[str, Any]) -> Tuple[str, str, str, float]
     - HOLD / HOLD
     """
     p = extract_quant_payload(payload)
+    
+    # Validação crítica: aborta se preços inválidos ou stop insuficiente
+    if "_validation_error" in p:
+        return "VETO", "VETO", p["_validation_error"], 0.99
+    
     intent_group = p["intent_group"]
     intent_subgroup = p["intent_subgroup"]
 

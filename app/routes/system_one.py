@@ -1,24 +1,24 @@
 # app/routes/system_one.py
 import time
-from fastapi import APIRouter, Request, HTTPException
+from fastapi import APIRouter, HTTPException, Request
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from typing import Dict, Any
 from ..engine.quant_rules import evaluate_quant_rules
 from ..engine.nlp_triage import classificar_triage_cerebro
+from ..models.schemas import SystemOneRequest, SystemOneResponse
 
 router = APIRouter()
+limiter = Limiter(key_func=get_remote_address)
 
 
-@router.post("/v1/systemone")
-async def handle_system_one(request: Request):
+@router.post("/v1/systemone", response_model=SystemOneResponse)
+@limiter.limit("300/minute")
+async def handle_system_one(req: SystemOneRequest, request: Request):
     t0 = time.perf_counter()
     
-    try:
-        data = await request.json()
-    except Exception:
-        raise HTTPException(status_code=400, detail="request body must be a valid JSON object")
-
-    if not isinstance(data, dict):
-        raise HTTPException(status_code=400, detail="request body must be an object")
+    # Converte Pydantic model para dict (validado e sanitizado)
+    data = req.model_dump(exclude_none=False)
 
     # Verifica se há o bloco questions ou state
     state = data.get("state") or {}
