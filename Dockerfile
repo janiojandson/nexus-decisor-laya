@@ -83,4 +83,6 @@ USER laya
 WORKDIR /home/laya
 
 ENTRYPOINT ["python", "/opt/laya/entrypoint.py"]
-CMD ["python", "/opt/laya/examples/quickstart.py"]
+# Railway injects PORT; the upstream server reads LAYA_PORT.
+# Keep the upstream entrypoint and map only the platform port at process start.
+CMD ["sh", "-c", "export LAYA_PORT=\"${LAYA_PORT:-${PORT:-8000}}\"; exec laya-serve"]
