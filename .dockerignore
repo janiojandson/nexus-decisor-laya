@@ -9,6 +9,7 @@
 !docker/
 !docker/entrypoint.py
 !docker/check_torch.py
+!railway_internal_proxy.py
 !laya/
 !laya/**
 !examples/
