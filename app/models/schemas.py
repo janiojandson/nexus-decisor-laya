@@ -1,6 +1,6 @@
 # app/models/schemas.py
 from typing import Dict, Any, Optional, Union, List
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class MicrostructureData(BaseModel):
@@ -44,6 +44,26 @@ class SystemOneRequest(BaseModel):
     risk: Optional[Union[RiskData, Dict[str, Any]]] = None
     state: Optional[Dict[str, Any]] = None
     questions: Optional[Dict[str, Any]] = None
+
+    @model_validator(mode="after")
+    def validate_nested_quant_state(self):
+        state = self.state or {}
+        is_quant = state.get("origem") == "mercado_financeiro" or "microstructure" in state or "action" in (self.questions or {})
+        if not is_quant:
+            return self
+
+        for key in ("currentPrice", "proposedStopLoss", "proposedTakeProfit", "delta_stop_bps", "currentR"):
+            value = state.get(key)
+            if value is not None:
+                try:
+                    float(value)
+                except (TypeError, ValueError):
+                    raise ValueError(f"state.{key} deve ser numérico")
+
+        side = state.get("side")
+        if side is not None and str(side).upper() not in ("BUY", "SELL"):
+            raise ValueError("state.side deve ser BUY ou SELL")
+        return self
 
 
 class SystemOneAnswer(BaseModel):
