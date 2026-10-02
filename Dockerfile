@@ -66,6 +66,7 @@ COPY LICENSE /usr/share/doc/laya/LICENSE
 COPY examples/docker/ /opt/laya/examples/
 COPY docker/entrypoint.py /opt/laya/entrypoint.py
 COPY docker/prefetch_modelscope.py /opt/laya/prefetch_modelscope.py
+COPY railway_internal_proxy.py /opt/laya/railway_internal_proxy.py
 
 # Bake the requested ModelScope checkpoints into the hub cache ($HF_HOME/hub), laid out the way
 # `snapshot_download` reads them offline, so no entry point changes: the quickstart's Router, the
@@ -84,6 +85,6 @@ USER laya
 WORKDIR /home/laya
 
 ENTRYPOINT ["python", "/opt/laya/entrypoint.py"]
-# Railway injects PORT; the upstream server reads LAYA_PORT.
-# Keep the upstream entrypoint and map only the platform port at process start.
-CMD ["sh", "-c", "export LAYA_PORT=\"${LAYA_PORT:-${PORT:-8000}}\"; exec laya-serve"]
+# Railway injects PORT. The supervisor starts the unchanged upstream laya-serve
+# on that public target port and a private-network-only authenticated proxy on 8001.
+CMD ["python", "/opt/laya/railway_internal_proxy.py"]

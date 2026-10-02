@@ -16,3 +16,10 @@ This branch is pinned to upstream Laya v0.3.23 (commit d8a2e59781ca135169a360950
 
 Domain applications must validate deterministic invariants before consulting Laya and must own all execution.
 Changes to this branch should remain upstream-aligned; Railway-specific integration must be minimal and explicit.
+
+## Railway private-service authentication
+- The public Railway target port runs the unchanged upstream `laya-serve` process and continues to require `LAYA_API_KEY`.
+- Port `8001` is reserved for a Railway private-network proxy. It is not assigned a public domain.
+- The private proxy injects the local bearer and forwards only `/health`, `/v1/systemone`, and `/v1/systemone/batch` to the upstream server on localhost.
+- Domain services should call `http://nexus-decisor-laya-next.railway.internal:8001` and must never embed the Laya secret.
+- This proxy is infrastructure glue only; it does not alter prompts, choices, scoring, confidence, routing, or any domain decision.
