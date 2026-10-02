@@ -14,6 +14,7 @@ from __future__ import annotations
 import asyncio
 import http.client
 import os
+import secrets
 import subprocess
 import sys
 import threading
@@ -117,9 +118,13 @@ async def private_proxy(request: Request, path: str):
 
 
 def main() -> None:
-    api_key = os.environ.get("LAYA_API_KEY")
-    if not api_key:
-        sys.exit("LAYA_API_KEY is required for Railway public/private operation")
+    # Prefer an operator-provided key. If Railway does not materialize a sealed
+    # key into a new deployment, generate an ephemeral strong bearer for this
+    # container. The public upstream remains authenticated; only this private
+    # proxy knows the generated token and injects it on localhost.
+    api_key = os.environ.get("LAYA_API_KEY") or secrets.token_urlsafe(48)
+    auth_source = "configured" if os.environ.get("LAYA_API_KEY") else "ephemeral"
+    os.environ["LAYA_API_KEY"] = api_key
 
     if INTERNAL_PORT == PUBLIC_PORT:
         sys.exit("LAYA_INTERNAL_PROXY_PORT must differ from PORT/LAYA_PORT")
@@ -149,7 +154,7 @@ def main() -> None:
 
     print(
         f"[RailwayPrivateProxy] internal=http://[::]:{INTERNAL_PORT} "
-        f"-> upstream=http://127.0.0.1:{PUBLIC_PORT}"
+        f"-> upstream=http://127.0.0.1:{PUBLIC_PORT} public_auth={auth_source}"
     )
 
     try:
