@@ -32,8 +32,8 @@ FROM ${PYTHON_IMAGE} AS runtime
 # Optional ModelScope prefetch: with `--build-arg MODELSCOPE_MODEL=multilingual` the checkpoint is
 # baked into the hub cache during the build, so the image never depends on huggingface.co. The
 # argument takes a checkpoint type (multilingual, english, typed-decisions, all) or a comma- or
-# space-separated list of `repo[:subfolder]` specs; empty by default leaves the image as it was.
-ARG MODELSCOPE_MODEL=""
+# space-separated list of `repo[:subfolder]` specs; Nexus defaults to multilingual for deterministic boots.
+ARG MODELSCOPE_MODEL="multilingual"
 ARG MODELSCOPE_REVISION="master"
 
 LABEL org.opencontainers.image.title="Laya Docker quickstart" \
@@ -53,7 +53,8 @@ ENV PATH="/opt/venv/bin:$PATH" \
     TOKENIZERS_PARALLELISM=false \
     OMP_NUM_THREADS=4 \
     LAYA_DEVICE=cpu \
-    HF_HOME=/home/laya/.cache/huggingface
+    HF_HOME=/home/laya/.cache/huggingface \
+    HF_HUB_OFFLINE=1
 
 RUN groupadd --gid 10001 laya \
     && useradd --uid 10001 --gid laya --create-home laya \
