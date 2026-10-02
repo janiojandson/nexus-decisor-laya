@@ -22,5 +22,5 @@ Changes to this branch should remain upstream-aligned; Railway-specific integrat
 - Port `8001` is reserved for a Railway private-network proxy. It is not assigned a public domain.
 - The private proxy injects the local bearer and forwards only `/health`, `/v1/systemone`, and `/v1/systemone/batch` to the upstream server on localhost.
 - If Railway does not materialize the sealed `LAYA_API_KEY` into a fresh deployment, the supervisor generates a cryptographically strong ephemeral bearer at boot and gives it only to the upstream process and private proxy. Public inference therefore remains bearer-protected even without distributing a shared secret to domain services.
-- Domain services should call `http://nexus-decisor-laya-next.railway.internal:8001` and must never embed the Laya secret.
+- Domain services should call `http://nexus-decisor-laya.railway.internal:8001` and must never embed the Laya secret.
 - This proxy is infrastructure glue only; it does not alter prompts, choices, scoring, confidence, routing, or any domain decision.
